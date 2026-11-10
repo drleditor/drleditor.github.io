@@ -1237,10 +1237,14 @@ function drawPole(ctx,L,d){
   // driver name, Northwell Clean, centred, baseline 451.75; gets smaller when it is too long
   fs=122.95;ctx.font=NF(fs);let m=ctx.measureText(nm);
   while(m.actualBoundingBoxLeft+m.actualBoundingBoxRight>690&&fs>30){fs-=1;ctx.font=NF(fs);m=ctx.measureText(nm);}
-  ctx.fillText(nm,387,451.25);
+  // Size slider (50-150 %, 100 = as designed): name and number scale together, anchored at the TOP of the name, so only the bottom moves
+  const sc=Math.min(1.5,Math.max(0.5,(parseFloat(d.plNameSize)||100)/100)),topY=451.25-m.actualBoundingBoxAscent;
+  if(sc!==1){fs*=sc;ctx.font=NF(fs);m=ctx.measureText(nm);}
+  const nameY=topY+m.actualBoundingBoxAscent;
+  ctx.fillText(nm,387,nameY);
   // car number: its right edge sits 6 units inside the right edge of the name, baseline 547.85
-  if(num){ctx.font=KF(400,59.15);ctx.textAlign='right';const t='// '+num,mm=ctx.measureText(t);
-    ctx.fillText(t,387.5+m.actualBoundingBoxRight-6-mm.actualBoundingBoxRight,547.85);}
+  if(num){ctx.font=KF(400,59.15*sc);ctx.textAlign='right';const t='// '+num,mm=ctx.measureText(t);
+    ctx.fillText(t,387.5+m.actualBoundingBoxRight-6*sc-mm.actualBoundingBoxRight,nameY+96.6*sc);}
   // team logo (white), bottom left: bottom edge at 735, left edge at 35
   let lr=35;const pl=plLogoFor(tm);
   if(pl){ctx.drawImage(pl.im,pl.p.x,pl.p.y,pl.p.w,pl.p.h);lr=pl.p.x+pl.p.w;}
@@ -2590,7 +2594,7 @@ const BK_SCRIPT_FS=272.5,BK_SCRIPT_BASE=1769;
 const TOOLS={
   winner:{group:'Race day',name:'Race Winner',desc:'Poster with a big photo, a huge WINNER, the driver and team and the round. You can change the background photo.',fields:['driver','team','round','race','bgPhoto','logoSel'],draw:drawWinnerRef,height:()=>1440,noDrvPhoto:true,
     mini:'<b style="left:0;top:0;width:100%;height:66%;background:#4a5060;border-radius:0"></b><i style="left:0;top:66%;width:100%;height:34%;background:#0c0714;border-radius:0"></i><b style="left:6%;top:70%;width:88%;height:12%;background:#fff"></b><b style="left:20%;top:86%;width:60%;height:4%;background:#fff"></b><b style="left:34%;top:93%;width:32%;height:3%"></b>'},
-  pole:{group:'Race day',name:'Pole Position',desc:'Wide poster with the pole lap time, the driver name in script, the car number, the team logo and a purple photo. You can change the photo.',fields:['driver','team','number','poleTime','round','race','bgPhoto','plTint'],draw:drawPole,width:()=>1440,height:()=>770,noDrvPhoto:true,
+  pole:{group:'Race day',name:'Pole Position',desc:'Wide poster with the pole lap time, the driver name in script, the car number, the team logo and a purple photo. You can change the photo.',fields:['driver','team','number','plNameSize','poleTime','round','race','bgPhoto','plTint'],draw:drawPole,width:()=>1440,height:()=>770,noDrvPhoto:true,
     mini:'<b style="left:0;top:0;width:54%;height:100%;background:#10001a;border-radius:0"></b><b style="left:54%;top:0;width:46%;height:100%;background:#8a2bb5;border-radius:0"></b><i style="left:4%;top:8%;width:46%;height:10%"></i><b style="left:9%;top:30%;width:38%;height:16%;background:#be00ff"></b><b style="left:13%;top:54%;width:28%;height:10%;background:#be00ff"></b><b style="left:5%;top:84%;width:14%;height:8%;background:#fff"></b><b style="left:30%;top:86%;width:20%;height:4%;background:#be00ff"></b>'},
   breaking:{group:'Race day',name:'BREAKING',desc:'Poster for big news, with a photo, the word BREAKING, a big headline in capitals and in script, a line below and a team logo. You can change the photo.',fields:['brkLabel','brkHead','brkFont','brkSub','brkTeam','brkLogo','bgPhoto'],draw:drawBreaking,width:()=>817,height:()=>991.5,noDrvPhoto:true,
     mini:'<b style="left:0;top:0;width:100%;height:100%;background:#1c1a22;border-radius:0"></b><b style="left:0;top:68%;width:100%;height:32%;background:#14001f;border-radius:0"></b><b style="left:6%;top:6%;width:48%;height:4%;background:#be00ff"></b><b style="left:6%;top:72%;width:20%;height:3%;background:#be00ff"></b><b style="left:6%;top:79%;width:88%;height:8%;background:#be00ff"></b><b style="left:6%;top:92%;width:40%;height:3%;background:#be00ff"></b>'},
@@ -2694,6 +2698,7 @@ const FIELDS={
   resPics:{l:'Podium photos (optional)',t:'pics',key:'resultsList',limit:3,box:'rsPhGrid',move:true,when:d=>d.resStyle!=='rows',help:'Photos of the first three drivers. A photo belongs to the name of the driver and stays on this device. The other graphics use it too. Photos with a see-through background (cut-outs) look best. “Move” lets you drag a photo on the podium and make it bigger or smaller.'},
   raceNat:{l:'Country flag',t:'natsel',half:true},session:{l:'Session',t:'text',half:true},
   bgAdj:{l:'Background size & position',t:'phbtn'},
+  plNameSize:{l:'Driver name & number size',t:'range',min:50,max:150,step:1,def:100,unit:'%',help:'Scales the name and the number together. The top of the name stays where it is, so a bigger name grows downwards.'},
   plTint:{l:'Purple tint on the photo',t:'check',def:true,help:'Turn it off to show the photo in its own colours.'},
   brkLabel:{l:'Label',t:'text',ph:'Breaking'},brkHead:{l:'Headline // Name',t:'text',ph:'Weltmeister'},brkFont:{l:'Headline font',t:'select',opts:[['normal','Normal'],['handwritten','Handwritten']]},
   brkSub:{l:'Headline // Info',t:'text',ph:'Joins Audi T2'},brkTeam:{l:'Team logo',t:'team',help:'The logo goes at the bottom right.'},
@@ -3626,7 +3631,7 @@ function openTool(k,keepScroll){
       const pics='';
       return `<div class="field"><span class="flabel">${F.l}</span><small>${F.help}</small><div class="lu-list"><div class="lu-row lu-head" aria-hidden="true"><span>Team</span><span>Driver 1</span><span>Driver 2</span></div>${seats}</div><span class="flabel lu-ph-h" hidden>Photos (optional)</span><small>Each photo belongs to its driver and is also used in the other graphics. This graphic shows only the part from the shoulders to the head. Use “Crop” to adjust it. Without a photo the seat shows a silhouette.</small><div class="lu-ph-grid" id="luPhGrid">${pics}</div></div>`;}
     else if(F.t==='pics'){if(current!=='top3'&&current!=='results')return '';return `<div class="field"><span class="flabel">${F.l}</span><small>${F.help}</small><div class="lu-ph-grid" id="${F.box}" data-pics="${F.key}" data-limit="${F.limit||0}"${F.move?' data-move="1"':''}>${picCardsHtml(d,F.key,F.limit,F.move)}</div></div>`;}
-    else if(F.t==='range'){input=`<input id="${id}" name="${f}" type="range" min="0" max="100" step="1" value="${F.get?F.get(d):(d[f]==null?50:d[f])}">`;}
+    else if(F.t==='range'){const rv=F.get?F.get(d):(d[f]==null||d[f]===''?(F.def==null?50:F.def):d[f]);input=`<input id="${id}" name="${f}" type="range" min="${F.min==null?0:F.min}" max="${F.max==null?100:F.max}" step="${F.step||1}" value="${rv}">`;if(F.unit)return `<div class="field"><label for="${id}" style="display:flex;justify-content:space-between;gap:8px"><span>${F.l}</span><output data-rv="${f}">${Math.round(rv)}${F.unit}</output></label>${input}${F.help?`<small>${F.help}</small>`:''}</div>`;}
     else if(F.t==='date'){input=`<input id="${id}" name="${f}" type="date" value="${esc(d[f]||todayISO())}">`;}
     else if(F.t==='seasonsel'){const cur=curSeason(d);
       return `<div class="field season-box"><label for="f-seasonSel">Season</label>
@@ -3687,6 +3692,7 @@ $('#form').addEventListener('input',e=>{
   if(el.name==='seasonSel')return;
   if(el.dataset&&el.dataset.k){const L=state[league][LK()]||[];const r=L[+el.dataset.i];if(r&&el.dataset.k==='gp'){r.gp=el.value;const g=F1_2026[+el.value];if(el.value!==''&&g){r.nat=g[1];r.track=g[2];r.city=g[3];}else{r.nat=r.track=r.city='';}save();clearTimeout(timer);timer=setTimeout(()=>{update();paintPage();},60);return;}if(r){if(el.dataset.k==='name'&&LK()!=='lineupList'){const old=r.name;for(const k of ['fl','dotd','pole'])if(old&&state[league][k]===old)state[league][k]=el.value;}r[el.dataset.k]=el.value;save();if(el.dataset.k==='name')refreshPickers();if(LK()==='lineupList'){const g=document.getElementById('luPhGrid');if(g)g.innerHTML=luPicsHtml(state[league]);}{const g=document.querySelector('#form [data-pics]');if(g&&g.dataset.pics===LK())g.innerHTML=picCardsHtml(state[league],g.dataset.pics,+g.dataset.limit||0,g.dataset.move==='1');phBtnSync();}clearTimeout(timer);timer=setTimeout(()=>{update();paintPage();},120);}return;}
   if(!el.name||el.type==='file'||el.type==='checkbox'||el.name==='pic'||el.name==='font'||el.name==='resultsRace'||el.name==='calLen'||el.name==='trRace'||el.name==='trTeam')return;
+  if(el.type==='range'){const o=$('#form').querySelector(`output[data-rv="${el.name}"]`);if(o)o.textContent=Math.round(el.value)+(FIELDS[el.name]&&FIELDS[el.name].unit||'');}
   state[league][el.name]=el.value;save();if(DRV_TEAM[el.name]){const b=document.getElementById('drvbox-'+el.name);if(b)b.innerHTML=drvBoxHtml(el.name);}clearTimeout(timer);timer=setTimeout(()=>{update();paintPage();},120);
 });
 $('#form').addEventListener('change',e=>{
