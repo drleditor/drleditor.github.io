@@ -894,7 +894,7 @@ function drawWinnerRef(ctx,L,d){
   // league logo at the top, centred (in the league colour, like the PSD; "White" in the logo choice means this colour)
   const [ll,lv]=String(d.logoSel||league+':white').split(':'),lkey=LEAGUES[ll]?ll:league;
   const lg=pickLogo(d.logoSel,d);
-  if(lg){let lh=43.5,lw=lh*lg.width/lg.height;if(lw>544){lw=544;lh=lw*lg.height/lg.width;}ctx.drawImage(lg,W/2-lw/2,76.75-lh/2,lw,lh);}
+  if(lg){let lh=43.5,lw=lh*lg.width/lg.height;if(lw>544){lw=544;lh=lw*lg.height/lg.width;}drawLogoOL(ctx,lg,W/2-lw/2,76.75-lh/2,lw,lh,!!d.wnOutline,d.logoSel);}
   setLS(ctx,'0px');if('fontStretch' in ctx)ctx.fontStretch='normal';ctx.textAlign='left';
 }
 /* ---------- Pole poster: two team colours, steep stripes with a dot raster, white bars on the left, big photo, huge POLE ---------- */
@@ -1084,8 +1084,10 @@ function drawDotdCard(ctx,L,d){
   const sub=([rnd?`ROUND ${rnd}`:'',nat||race].filter(Boolean).join(' // ')||L.full).toUpperCase();
   const [fn,ln]=splitName(String(d.driver||'').trim()||'Driver');
   ctx.save();ctx.textAlign='center';ctx.textBaseline='alphabetic';ctx.fillStyle=acc;
-  dotdCap(ctx,sub,29.5,PW-80,'regular');ctx.fillText(sub,CX,1217.5);
-  const nm=ln.toUpperCase();dotdCap(ctx,nm,105,PW-80,'regular');ctx.fillText(nm,CX,1391.5);
+  const olOn=!!d.dotdOutline,olCol='#000000';
+  const olText=(t,x,y)=>{if(!olOn)return;const fs=parseFloat((/([\d.]+)px/.exec(ctx.font)||[0,40])[1]);ctx.save();ctx.lineJoin='round';ctx.strokeStyle=olCol;ctx.lineWidth=fs*0.16;ctx.strokeText(t,x,y);ctx.restore();};
+  dotdCap(ctx,sub,29.5,PW-80,'regular');olText(sub,CX,1217.5);ctx.fillText(sub,CX,1217.5);
+  const nm=ln.toUpperCase();dotdCap(ctx,nm,105,PW-80,'regular');olText(nm,CX,1391.5);ctx.fillText(nm,CX,1391.5);
   ctx.restore();
   // right strip
   if(DOTD_A.strip)ctx.drawImage(DOTD_A.strip,PW,0,W-PW,H);else{ctx.fillStyle='#04000f';ctx.fillRect(PW,0,W-PW,H);}
@@ -1620,6 +1622,12 @@ function tintLogo(key,color){const id=key+color;if(tintCache[id])return tintCach
 function pickLogo(sel,d){const [l,v]=String(sel||league+':white').split(':');const key=LEAGUES[l]?l:league;
   if(v==='color')return logoImg[key];if(v==='team'||v==='#ffd23f')return whiteLogo[key]||tintLogo(key,'#ffffff');
   if(v==='white')return whiteLogo[key]||tintLogo(key,'#ffffff');if(/^#[0-9a-f]{6}$/i.test(v))return tintLogo(key,v);return logoImg[key];}
+// Black outline for logos and text. When the logo colour is Black the outline turns white instead, so the logo stays visible.
+function olColor(sel){const v=String(sel||'').split(':')[1]||'';return /^(#0b0d12|#000000|#000)$/i.test(v)?'#ffffff':'#000000';}
+const olSilCache=new WeakMap();
+function olSil(img,col){let m=olSilCache.get(img);if(!m){m={};olSilCache.set(img,m);}if(m[col])return m[col];
+  const c=document.createElement('canvas');c.width=img.width;c.height=img.height;const x=c.getContext('2d');x.drawImage(img,0,0);x.globalCompositeOperation='source-in';x.fillStyle=col;x.fillRect(0,0,c.width,c.height);m[col]=c;return c;}
+function drawLogoOL(ctx,img,x,y,w,h,on,sel,r){if(on){const sil=olSil(img,olColor(sel)),k=r||Math.max(1.5,h*0.05);for(let i=0;i<16;i++){const a=i*Math.PI/8;ctx.drawImage(sil,x+Math.cos(a)*k,y+Math.sin(a)*k,w,h);}}ctx.drawImage(img,x,y,w,h);}
 function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
 /* ---------- More tools (update) ---------- */
 function logoAt(ctx,team,x,y,h,maxW){const tl=teamLogoFor(team);if(!tl)return 0;const r=Math.min(maxW/tl.width,h/tl.height);const w=tl.width*r,hh=tl.height*r;ctx.drawImage(tl,x,y+(h-hh)/2,w,hh);return w;}
@@ -2522,7 +2530,7 @@ function drawSwipe(ctx,L,d){
   rtReset(ctx);}
 
 // Driver of the Day: fields for "only the driver of the day" and for "with the vote shares"
-const DOTD_FIELDS={card:['driver','team','bgAdj','round','race'],vote:['dotdMode','presented','pctList','font','logoSel']};
+const DOTD_FIELDS={card:['driver','team','bgAdj','round','race','dotdOutline'],vote:['dotdMode','presented','pctList','font','logoSel']};
 // Qualifying: the four looks and their fields
 const QUALI_FIELDS={gaps:['race','gapList','poleTime'],boxes:['round','session','driver','team','pos1','driver2','team2','pos2','photo'],
   text:['round','race','posA','number','driver','team','posB','num2','driver2','team2'],big:['posBig','race','qLabel','raceDate','driver','team','photo']};
@@ -2645,7 +2653,7 @@ function drawBreaking(ctx,L,d){
   if(bkHue){ctx.globalCompositeOperation='hue';ctx.drawImage(bkHue,0,234);ctx.globalCompositeOperation='source-over';}
   if(bkDark)ctx.drawImage(bkDark,0,234);
   ctx.fillStyle=BK_PURPLE;
-  const tc=bkTitleFor(d.brkLogo);if(tc)ctx.drawImage(tc,421,41,792,64);ctx.fillStyle=BK_PURPLE;
+  const tc=bkTitleFor(d.brkLogo);if(tc)drawLogoOL(ctx,tc,421,41,792,64,!!d.brkOutline,d.brkLogo||(league+':color'),4);ctx.fillStyle=BK_PURPLE;
   // KH Interference text, capitals exactly cap px high (as set in the PSD); smaller when too wide, left edge at x
   const kh=(txt,wt,cap,base,maxW)=>{if(!txt)return;let s=wnKh(ctx,cap,wt),m=ctx.measureText(txt);const w=m.actualBoundingBoxLeft+m.actualBoundingBoxRight;
     if(w>maxW){const k=maxW/w;s*=k;base-=cap/2*(1-k);ctx.font=KF(wt,s);m=ctx.measureText(txt);}ctx.textAlign='left';ctx.fillText(txt,40+m.actualBoundingBoxLeft,base);};
@@ -2665,17 +2673,17 @@ function drawBreaking(ctx,L,d){
 const BK_SCRIPT_FS=272.5,BK_SCRIPT_BASE=1769;
 
 const TOOLS={
-  winner:{group:'Race day',name:'Race Winner',desc:'Poster with a big photo, a huge WINNER, the driver and team and the round. You can change the background photo.',fields:['driver','team','round','race','bgPhoto','logoSel'],draw:drawWinnerRef,height:()=>1440,noDrvPhoto:true,
+  winner:{group:'Race day',name:'Race Winner',desc:'Poster with a big photo, a huge WINNER, the driver and team and the round. You can change the background photo.',fields:['driver','team','round','race','bgPhoto','logoSel','wnOutline'],draw:drawWinnerRef,height:()=>1440,noDrvPhoto:true,
     mini:'<b style="left:0;top:0;width:100%;height:66%;background:#4a5060;border-radius:0"></b><i style="left:0;top:66%;width:100%;height:34%;background:#0c0714;border-radius:0"></i><b style="left:6%;top:70%;width:88%;height:12%;background:#fff"></b><b style="left:20%;top:86%;width:60%;height:4%;background:#fff"></b><b style="left:34%;top:93%;width:32%;height:3%"></b>'},
   pole:{group:'Race day',name:'Pole Position',desc:'Wide poster with the pole lap time, the driver name in script, the car number, the team logo and a purple photo. You can change the photo.',fields:['driver','team','number','plNameSize','poleTime','round','race','bgPhoto','plTint'],draw:drawPole,width:()=>1440,height:()=>770,noDrvPhoto:true,
     mini:'<b style="left:0;top:0;width:54%;height:100%;background:#10001a;border-radius:0"></b><b style="left:54%;top:0;width:46%;height:100%;background:#8a2bb5;border-radius:0"></b><i style="left:4%;top:8%;width:46%;height:10%"></i><b style="left:9%;top:30%;width:38%;height:16%;background:#be00ff"></b><b style="left:13%;top:54%;width:28%;height:10%;background:#be00ff"></b><b style="left:5%;top:84%;width:14%;height:8%;background:#fff"></b><b style="left:30%;top:86%;width:20%;height:4%;background:#be00ff"></b>'},
-  breaking:{group:'Race day',name:'BREAKING',desc:'Poster for big news, with a photo, the word BREAKING, a big headline in capitals and in script, a line below and a team logo. You can change the photo.',fields:['brkLabel','brkHead','brkFont','brkSub','brkTeam','brkLogo','bgPhoto'],draw:drawBreaking,width:()=>817,height:()=>991.5,noDrvPhoto:true,
+  breaking:{group:'Race day',name:'BREAKING',desc:'Poster for big news, with a photo, the word BREAKING, a big headline in capitals and in script, a line below and a team logo. You can change the photo.',fields:['brkLabel','brkHead','brkFont','brkSub','brkTeam','brkLogo','brkOutline','bgPhoto'],draw:drawBreaking,width:()=>817,height:()=>991.5,noDrvPhoto:true,
     mini:'<b style="left:0;top:0;width:100%;height:100%;background:#1c1a22;border-radius:0"></b><b style="left:0;top:68%;width:100%;height:32%;background:#14001f;border-radius:0"></b><b style="left:6%;top:6%;width:48%;height:4%;background:#be00ff"></b><b style="left:6%;top:72%;width:20%;height:3%;background:#be00ff"></b><b style="left:6%;top:79%;width:88%;height:8%;background:#be00ff"></b><b style="left:6%;top:92%;width:40%;height:3%;background:#be00ff"></b>'},
   grid:{group:'Race day',name:'Starting Grid',desc:'THE GRID down the side, ten drivers per picture with position box, name and white team logo.',fields:['round','track','gridPage','gridList'],draw:drawGridRef,height:()=>1440,
     mini:'<b style="left:5%;top:8%;width:9%;height:84%;background:#fff"></b><i style="left:22%;top:12%;width:8%;height:10%"></i><b style="left:31%;top:12%;width:62%;height:10%"></b><i style="left:22%;top:28%;width:8%;height:10%"></i><b style="left:31%;top:28%;width:62%;height:10%"></b><i style="left:22%;top:44%;width:8%;height:10%"></i><b style="left:31%;top:44%;width:62%;height:10%"></b><i style="left:22%;top:60%;width:8%;height:10%"></i><b style="left:31%;top:60%;width:62%;height:10%"></b><i style="left:22%;top:76%;width:8%;height:10%"></i><b style="left:31%;top:76%;width:62%;height:10%"></b>'},
   results:{group:'Race day',name:'Race Results',desc:'Poster with the result of one race: the podium with photos for the first three and rows with the team logo and the points for P4 to P10. Saves to the season.',fields:['round','track','resultsList','rsPics','rsTint','fl','flPoint'],draw:drawResultsPsd,width:()=>1080,height:()=>1440,
     mini:'<b style="left:0;top:0;width:100%;height:100%;background:#10001a;border-radius:0"></b><b style="left:4%;top:6%;width:6%;height:88%;background:#be00ff"></b><b style="left:22%;top:36%;width:22%;height:25%;background:#530070"></b><b style="left:46%;top:24%;width:22%;height:37%;background:#530070"></b><b style="left:70%;top:46%;width:22%;height:15%;background:#530070"></b><i style="left:22%;top:68%;width:8%;height:7%"></i><b style="left:32%;top:68%;width:56%;height:7%;background:#000"></b><i style="left:22%;top:78%;width:8%;height:7%"></i><b style="left:32%;top:78%;width:56%;height:7%;background:#000"></b><i style="left:22%;top:88%;width:8%;height:7%"></i><b style="left:32%;top:88%;width:56%;height:7%;background:#000"></b>'},
-  teamres:{group:'Race day',name:'Team Result',desc:'Your own photo in the background, both drivers with their finishing positions in front, like a team post.',fields:['trRace','trTeam','trSession','trPhoto','logoSel'],draw:drawTeamResPhoto,
+  teamres:{group:'Race day',name:'Team Result // BETA',desc:'Your own photo in the background, both drivers with their finishing positions in front, like a team post.',fields:['trRace','trTeam','trSession','trPhoto','logoSel'],draw:drawTeamResPhoto,
     mini:'<b style="left:0;top:0;width:100%;height:100%;background:#4a5060;border-radius:0"></b><b style="left:8%;top:12%;width:26%;height:18%;background:#fff"></b><b style="left:66%;top:12%;width:26%;height:18%;background:#fff"></b><b style="left:8%;top:36%;width:20%;height:5%"></b><b style="left:72%;top:36%;width:20%;height:5%"></b><b style="left:8%;top:80%;width:30%;height:6%;background:#fff"></b><b style="left:80%;top:78%;width:12%;height:10%;background:var(--accent)"></b>'},
   standings:{group:'Standings & points',name:'Driver Standings',desc:'Points from every race you saved. Two looks: a table with every race, or rows in the team colours.',fields:['seasonSel','standStyle','standMode','standPage','raceDate','standTitle','seasonInfo','font','logoSel'],draw:drawSeason,height:d=>d.standStyle==='tv'?1350:seasonLayout(d).H,width:d=>d.standStyle==='tv'?1080:seasonLayout(d).W,
     mini:'<b style="left:14px;top:14px;width:80%;height:10px"></b><b style="left:14px;top:32px;width:80%;height:10px"></b><b style="left:14px;top:50px;width:80%;height:10px"></b><i style="right:16px;top:14px;width:16px;height:46px"></i>'},
@@ -2685,7 +2693,7 @@ const TOOLS={
     mini:'<i style="left:14px;top:16px;width:34%;height:16px"></i><b style="left:14px;top:42px;width:80%;height:12px"></b><b style="left:14px;top:60px;width:60%;height:12px"></b>'},
   stewards:{group:'News & notices',name:'Stewards Decision',desc:'An official penalty notice for a driver.',fields:['raceDate','track','raceNat','round','session','driver','number','team','stime','incident','decision','reason','font'],draw:drawStewards2,height:d=>stewLayout(d).H,
     mini:'<b style="left:22%;top:10px;width:56%;height:72px;background:#d9dde5"></b><i style="left:27%;top:18px;width:20%;height:8px"></i>'},
-  dotdcard:{group:'Race day',name:'Driver of the Day',desc:'The driver of the day, like on TV, with your own photo and background.',fields:['driver','team','bgAdj','raceNat','round','race','presented','pctList','photo','bgPhoto','font','logoSel'],show:(f,d)=>DOTD_FIELDS.card.includes(f),draw:(c,L,d)=>drawDotdCard(c,L,d),width:d=>1080,height:d=>1440,
+  dotdcard:{group:'Race day',name:'Driver of the Day',desc:'The driver of the day, like on TV, with your own photo and background.',fields:['driver','team','bgAdj','raceNat','round','race','presented','pctList','photo','bgPhoto','font','logoSel','dotdOutline'],show:(f,d)=>DOTD_FIELDS.card.includes(f),draw:(c,L,d)=>drawDotdCard(c,L,d),width:d=>1080,height:d=>1440,
     mini:'<b style="left:0;top:0;width:100%;height:100%;background:#a3122a"></b><b style="left:8%;top:12%;width:40%;height:88%;background:rgba(255,255,255,.22)"></b><b style="left:17%;top:22%;width:22%;height:78%;background:#1b1d24;border-radius:40% 40% 0 0"></b><b style="left:56%;top:18%;width:36%;height:11%;background:#fff"></b><b style="left:56%;top:33%;width:32%;height:11%;background:#fff"></b><b style="left:56%;top:48%;width:20%;height:11%;background:#fff"></b><b style="left:56%;top:80%;width:28%;height:8%;background:#fff"></b>'},
   top3:{group:'Race day',name:'Race Top 3',desc:'Poster with the first three of the race: three podiums with the driver photo, name, place and team logo. P1 stands in the middle.',fields:['round','race','top3List','top3Pics','t3Tint'],draw:drawTop3,width:()=>1440,height:()=>1080,
     mini:'<b style="left:0;top:0;width:100%;height:100%;background:#10001a"></b><b style="left:4%;top:6%;width:5%;height:88%;background:#be00ff"></b><b style="left:19%;top:50%;width:22.6%;height:50%;background:#530070"></b><b style="left:46%;top:40%;width:22.6%;height:60%;background:#530070"></b><b style="left:73%;top:60%;width:22.6%;height:40%;background:#530070"></b><i style="left:20%;top:41%;width:15%;height:6%;background:#be00ff"></i><i style="left:47%;top:31%;width:15%;height:6%;background:#be00ff"></i><i style="left:74%;top:51%;width:15%;height:6%;background:#be00ff"></i>'},
@@ -2697,11 +2705,11 @@ const TOOLS={
     mini:'<i style="left:14px;top:14px;width:70%;height:12px"></i><i style="left:14px;top:32px;width:50%;height:12px"></i><b style="left:14px;top:70px;width:72%;height:16px"></b><b style="left:14px;top:92px;width:40%;height:10px"></b>'},
   quotes:{group:'Drivers & teams',name:'Interview Quotes',desc:'Two quotes, one above the other, each with its driver.',fields:['driver','team','quote','driver2','team2','quote2','raceDate','font','logoSel'],draw:drawQuotes,
     mini:'<b style="left:12px;top:10px;width:76%;height:30px"></b><b style="left:12px;top:48px;width:60%;height:8px"></b><b style="left:12px;top:68px;width:70%;height:30px"></b><b style="left:12px;top:106px;width:50%;height:8px"></b>'},
-  radio:{group:'Race day',name:'Team Radio',desc:'Like on TV: the driver name with RADIO and the team logo, then the messages - the team on the left, the driver on the right.',fields:['driver','team','radioFirst','radioMsg','logoSel'],draw:drawRadio,
+  radio:{group:'Race day',name:'Team Radio // BETA',desc:'Like on TV: the driver name with RADIO and the team logo, then the messages - the team on the left, the driver on the right.',fields:['driver','team','radioFirst','radioMsg','logoSel'],draw:drawRadio,
     mini:'<i style="left:12px;top:12px;width:8px;height:8px;background:#e10600"></i><b style="left:12px;top:30px;width:80%;height:12px"></b><b style="left:12px;top:48px;width:64%;height:12px"></b><b style="left:12px;top:84px;width:30%;height:14px"></b>'},
   points:{group:'Standings & points',name:'Points',desc:'Points scored by a driver in one race, on a driver card.',fields:['driver','team','ptsAdd','round','race','photo','font','logoSel'],draw:drawPointsCard,
     mini:'<b style="left:12px;top:14px;width:50%;height:44px;background:#ffd23f"></b><b style="left:12px;top:72px;width:60%;height:10px"></b><b style="left:12px;top:90px;width:40%;height:10px"></b>'},
-  tyres:{group:'Race day',name:'Tyre Compounds',desc:'A wheel for every tyre with its colour, the name big in that colour and a short text. Optional: the C numbers of the race, intermediate and wet tyres.',fields:['round','race','raceDate','tyreCs','tyreInter','tyreWet','tyreTxt','logoSel'],draw:drawTyres,
+  tyres:{group:'Race day',name:'Tyre Compounds // BETA',desc:'A wheel for every tyre with its colour, the name big in that colour and a short text. Optional: the C numbers of the race, intermediate and wet tyres.',fields:['round','race','raceDate','tyreCs','tyreInter','tyreWet','tyreTxt','logoSel'],draw:drawTyres,
     mini:'<b style="left:-7%;top:2%;width:20%;height:32%;border-radius:50%;background:#2b2d31;box-shadow:inset 0 0 0 3px #e8202a"></b><b style="left:-7%;top:35%;width:20%;height:32%;border-radius:50%;background:#2b2d31;box-shadow:inset 0 0 0 3px #ffd23f"></b><b style="left:-7%;top:68%;width:20%;height:32%;border-radius:50%;background:#2b2d31;box-shadow:inset 0 0 0 3px #f2f2f2"></b><b style="left:20%;top:8%;width:30%;height:11%;background:#e8202a"></b><b style="left:20%;top:23%;width:64%;height:5%"></b><b style="left:20%;top:41%;width:40%;height:11%;background:#ffd23f"></b><b style="left:20%;top:56%;width:64%;height:5%"></b><b style="left:20%;top:74%;width:28%;height:11%;background:#f2f2f2"></b><b style="left:20%;top:89%;width:64%;height:5%"></b>'},
   lineup:{group:'Drivers & teams',name:'Driver Lineup',desc:'Two drivers for every team. Change the names, the season and optional photos.',fields:['season','lineupList'],draw:drawLineup,width:()=>1920,height:()=>1080,
     mini:'<b style="left:6%;top:12%;width:40%;height:12%"></b><b style="left:54%;top:12%;width:40%;height:12%"></b><b style="left:6%;top:34%;width:40%;height:12%"></b><b style="left:54%;top:34%;width:40%;height:12%"></b><b style="left:6%;top:56%;width:40%;height:12%"></b><i style="left:54%;top:56%;width:40%;height:12%"></i><b style="left:30%;top:78%;width:40%;height:12%"></b>'},
@@ -2715,11 +2723,11 @@ const TOOLS={
     mini:'<b style="left:0;top:0;width:100%;height:100%;background:#1f7d76"></b><i style="left:12%;top:14%;width:44%;height:72%;background:#0b1420"></i><b style="left:58%;top:70%;width:34%;height:10px"></b><b style="left:58%;top:84%;width:24%;height:8px"></b>'},
   seasonCards:{group:'Drivers & teams',name:'Season Results Cards',desc:'Three cards with the last three results of one driver, one card for each race.',fields:['driver','team','season','photo','font','logoSel'],draw:drawSeasonCards,
     mini:'<b style="left:0;top:0;width:44%;height:100%;background:#e7e9ee"></b><i style="left:52%;top:8%;width:44%;height:26%;background:#15161e"></i><b style="left:52%;top:40%;width:44%;height:26%;background:#15161e"></b><b style="left:52%;top:72%;width:44%;height:24%;background:#15161e"></b>'},
-  quali:{group:'Race day',name:'Qualifying',desc:'Four looks at the top: the gaps to pole on a track, two positions in big boxes, two positions as text, or one huge position.',fields:['qualiLook','round','session','posBig','race','qLabel','raceDate','gapList','poleTime','posA','number','driver','team','pos1','posB','num2','driver2','team2','pos2','photo','font','logoSel'],show:(f,d)=>f==='qualiLook'||f==='font'||f==='logoSel'||QUALI_FIELDS[qualiLook(d)].includes(f),draw:(c,L,d)=>({gaps:drawQGaps,boxes:drawQSprint,text:drawQText,big:drawQP2})[qualiLook(d)](c,L,d),
+  quali:{group:'Race day',name:'Qualifying // BETA',desc:'Four looks at the top: the gaps to pole on a track, two positions in big boxes, two positions as text, or one huge position.',fields:['qualiLook','round','session','posBig','race','qLabel','raceDate','gapList','poleTime','posA','number','driver','team','pos1','posB','num2','driver2','team2','pos2','photo','font','logoSel'],show:(f,d)=>f==='qualiLook'||f==='font'||f==='logoSel'||QUALI_FIELDS[qualiLook(d)].includes(f),draw:(c,L,d)=>({gaps:drawQGaps,boxes:drawQSprint,text:drawQText,big:drawQP2})[qualiLook(d)](c,L,d),
     mini:'<b style="left:14px;top:14px;width:50%;height:12px"></b><i style="left:14px;top:36px;width:60%;height:12px"></i><b style="left:14px;top:58px;width:40%;height:12px"></b><b style="left:14px;top:80px;width:70%;height:12px;background:#be00ff"></b>'},
   titleChance:{group:'Standings & points',name:'Title Chance',desc:'Chance of each driver to win the championship, as bars with photo, percentage and trophy.',fields:['race','pctList','font','logoSel'],draw:drawTitleChance,
     mini:'<b style="left:6%;top:6%;width:88%;height:18%;background:#27f4d2"></b><b style="left:6%;top:30%;width:88%;height:18%;background:#1d2c6b"></b><b style="left:6%;top:54%;width:88%;height:18%;background:#e8002d"></b><b style="left:6%;top:78%;width:88%;height:16%;background:#27f4d2"></b>'},
-  penalties:{group:'Race day',name:'Grid Penalties',desc:'One, two or three drivers with their grid penalty, each with a photo and a team-colour band.',fields:['penCount','race','penList','penPics','font','logoSel'],draw:drawPenalties,
+  penalties:{group:'Race day',name:'Grid Penalties // BETA',desc:'One, two or three drivers with their grid penalty, each with a photo and a team-colour band.',fields:['penCount','race','penList','penPics','font','logoSel'],draw:drawPenalties,
     mini:'<b style="left:2%;top:4%;width:30%;height:66%;background:#3a3f4d"></b><b style="left:35%;top:4%;width:30%;height:66%;background:#4a4f5d"></b><b style="left:68%;top:4%;width:30%;height:66%;background:#3a3f4d"></b><i style="left:2%;top:76%;width:96%;height:20%;background:#e8002d"></i>'},
   scenario:{group:'Standings & points',name:'Title Scenario',desc:'What one driver needs to win the title: a win and the results of two rivals, with photo.',fields:['driver','team','condName1','condPos1','condName2','condPos2','photo','font','logoSel'],draw:drawScenario,
     mini:'<b style="left:0;top:0;width:42%;height:100%;background:#15161c"></b><i style="left:8%;top:12%;width:26%;height:10%;background:#d9b65a"></i><b style="left:8%;top:44%;width:26%;height:8%"></b><b style="left:8%;top:62%;width:26%;height:8%;background:#be00ff"></b><b style="left:46%;top:0;width:54%;height:100%;background:#4a5060"></b>'},
@@ -2754,6 +2762,9 @@ const FIELDS={
   teamLogo:{l:'Replace team logo (optional)',t:'file',help:'Team logos are built in. Upload a PNG to use a different one for this team in the other graphics, like results and standings.'},
   rdVig:{l:'Vignettes (dark edges)',t:'check',def:true,help:'Turn it off to show the photo without the fade.'},
   rdOutline:{l:'Black outline',t:'check',help:'Makes the text easier to read on a bright photo.'},
+  wnOutline:{l:'Black outline',t:'check',help:'Adds an outline around the logo. If the logo colour is Black, the outline is white.'},
+  brkOutline:{l:'Black outline',t:'check',help:'Adds an outline around the logo. If the logo colour is Black, the outline is white.'},
+  dotdOutline:{l:'Black outline',t:'check',help:'Adds an outline around the driver name and the round name.'},
   rdTag:{l:'Series line',t:'text',half:true,ph:'F1 26 T1',help:'The first part of the line at the bottom, before the round.'},
   season:{l:'Season',t:'text',ph:'2027'},round:{l:'Round',t:'text',half:true},track:{l:'Track',t:'text',half:true},
   pDriver:{l:'Pole sitter',t:'driver',help:'Type any name, for example a gamertag.'},pTeam:{l:'Team',t:'team'},
